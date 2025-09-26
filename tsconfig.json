@@ -1,0 +1,28 @@
+// tsconfig.json
+{
+  "compilerOptions": {
+    /* --- Opciones del Proyecto --- */
+    "target": "ES2020", // Genera código JavaScript compatible con versiones modernas de Node.js
+    "module": "CommonJS", // El sistema de módulos estándar para CLIs de Node.js
+    "outDir": "./dist", // Dónde dejar los archivos .js compilados
+    "rootDir": "./src", // Dónde encontrar los archivos .ts fuente
+
+    /* --- Opciones de Módulos --- */
+    "moduleResolution": "node", // Cómo TypeScript busca los módulos
+    "esModuleInterop": true, // Permite importar módulos CommonJS como si fueran ES Modules
+
+    /* --- Opciones de Chequeo Estricto --- */
+    "strict": true, // Habilita todas las comprobaciones estrictas de tipos
+    "skipLibCheck": true, // Evita la comprobación de tipos en los archivos de declaración (.d.ts) de las dependencias
+
+    /* --- Opciones de Emisión --- */
+    "forceConsistentCasingInFileNames": true, // Asegura que las mayúsculas/minúsculas en los nombres de archivo sean consistentes
+    "resolveJsonModule": true // Permite importar archivos .json
+  },
+  "include": [
+    "src/**/*" // Qué archivos debe compilar TypeScript (todos los archivos dentro de 'src')
+  ],
+  "exclude": [
+    "node_modules" // Qué carpetas ignorar
+  ]
+}
