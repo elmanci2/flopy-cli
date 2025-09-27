@@ -7,6 +7,7 @@ import Table from "cli-table3";
 import inquirer from "inquirer";
 import apiClient from "../lib/api-client";
 import { handleApiError } from "../lib/error-handler";
+import { resolveAppId } from "../lib/app-resolver";
 
 export function registerAppCommands(program: Command) {
   const appCommand = program
@@ -88,6 +89,75 @@ export function registerAppCommands(program: Command) {
         );
       } catch (error) {
         spinner.fail(`No se pudo eliminar la aplicación.`);
+        handleApiError(error);
+      }
+    });
+
+  const deploymentCommand = appCommand
+    .command("deployment")
+    .description(
+      "Gestiona las claves de despliegue (deployment keys) de una aplicación",
+    );
+
+  deploymentCommand
+    .command("add <appName> <channel>")
+    .description(
+      "Crea una nueva clave de despliegue para un canal (ej. Staging, Production)",
+    )
+    .action(async (appName: string, channel: string) => {
+      const appId = await resolveAppId(appName);
+      if (!appId) return;
+
+      const spinner = ora(
+        `Creando clave para el canal '${channel}'...`,
+      ).start();
+      try {
+        const response = await apiClient.post(`/apps/${appId}/deployments`, {
+          channel,
+        });
+        spinner.succeed(chalk.green(`¡Clave de despliegue creada con éxito!`));
+        console.log(`  ${chalk.bold("Canal:")} ${response.data.channel}`);
+        console.log(
+          `  ${chalk.bold("Clave:")} ${chalk.yellow(response.data.key)}`,
+        );
+        console.log(
+          chalk.cyan(
+            "\nCopia esta clave y pégala en la configuración de CodePush de tu app nativa.",
+          ),
+        );
+      } catch (error) {
+        spinner.fail("No se pudo crear la clave de despliegue.");
+        handleApiError(error);
+      }
+    });
+
+  deploymentCommand
+    .command("list <appName>")
+    .alias("ls")
+    .description("Lista todas las claves de despliegue para una aplicación")
+    .action(async (appName: string) => {
+      const appId = await resolveAppId(appName);
+      if (!appId) return;
+
+      const spinner = ora(
+        `Obteniendo claves de despliegue para '${appName}'...`,
+      ).start();
+      try {
+        const response = await apiClient.get(`/apps/${appId}/deployments`);
+        spinner.succeed(`Claves de despliegue para '${appName}':`);
+
+        const table = new Table({
+          head: [chalk.cyan("Canal"), chalk.cyan("Clave de Despliegue")],
+          colWidths: [20, 40],
+        });
+
+        response.data.forEach((key: any) => {
+          table.push([key.channel, key.key]);
+        });
+
+        console.log(table.toString());
+      } catch (error) {
+        spinner.fail("No se pudieron obtener las claves de despliegue.");
         handleApiError(error);
       }
     });
