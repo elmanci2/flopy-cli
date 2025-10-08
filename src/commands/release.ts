@@ -274,4 +274,26 @@ export function registerReleaseCommands(program: Command) {
         handleApiError(error);
       }
     });
+
+  releaseCommand
+    .command("change-state <releaseId>")
+    .description("Change state for release")
+    .option("-s, --state <state>", "Estado de la release", "Pending")
+    .action(async (releaseId, options) => {
+      const spinner = ora(
+        `Cambiando estado de la release ID: ${releaseId}...`,
+      ).start();
+      try {
+        await apiClient.post(`/releases/state`, {
+          state: options.status,
+          id: releaseId,
+        });
+        spinner.succeed(
+          chalk.green(`¡Estado de la release cambiado con éxito!`),
+        );
+      } catch (error) {
+        spinner.fail("No se pudo cambiar el estado de la release.");
+        handleApiError(error);
+      }
+    });
 }

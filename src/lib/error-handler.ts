@@ -6,7 +6,6 @@ export function handleApiError(error: any) {
   if (error.isAxiosError) {
     const axiosError = error as AxiosError;
     if (axiosError.response) {
-      // El servidor respondió con un código de error (4xx, 5xx)
       console.log(
         chalk.red(`Error del servidor (${axiosError.response.status}):`),
       );
@@ -20,7 +19,6 @@ export function handleApiError(error: any) {
         );
       }
     } else if (axiosError.request) {
-      // La petición se hizo pero no se recibió respuesta (ej. servidor caído)
       console.log(chalk.red("Error de red: No se pudo conectar al servidor."));
       console.log(
         chalk.yellow(
@@ -28,7 +26,6 @@ export function handleApiError(error: any) {
         ),
       );
     } else {
-      // Error al configurar la petición
       console.log(
         chalk.red(
           "Error en la configuración de la petición:",
@@ -37,7 +34,6 @@ export function handleApiError(error: any) {
       );
     }
   } else {
-    // Otro tipo de error
     console.log(chalk.red("Ocurrió un error inesperado:", error.message));
   }
 }
