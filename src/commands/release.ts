@@ -284,9 +284,16 @@ export function registerReleaseCommands(program: Command) {
         `Cambiando estado de la release ID: ${releaseId}...`,
       ).start();
       try {
+        const normalizedState =
+          options.state === "true"
+            ? true
+            : options.state === "false"
+              ? false
+              : options.state;
+
         await apiClient.post(`/releases/state`, {
-          state: options.status,
           id: releaseId,
+          state: normalizedState,
         });
         spinner.succeed(
           chalk.green(`¡Estado de la release cambiado con éxito!`),
