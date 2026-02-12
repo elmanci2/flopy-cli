@@ -7,6 +7,36 @@ import chalk from "chalk";
 import os from "os";
 
 /**
+ * Detecta si es un proyecto Expo
+ */
+function isExpoProject(): boolean {
+  if (!fs.existsSync("package.json")) {
+    return false;
+  }
+  const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  return !!(deps["expo"] || fs.existsSync("app.json") && hasExpoConfig());
+}
+
+/**
+ * Verifica si app.json tiene configuración de Expo
+ */
+function hasExpoConfig(): boolean {
+  try {
+    if (fs.existsSync("app.json")) {
+      const appConfig = JSON.parse(fs.readFileSync("app.json", "utf8"));
+      return !!appConfig.expo;
+    }
+    if (fs.existsSync("app.config.js") || fs.existsSync("app.config.ts")) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+/**
  * Detecta la ruta de hermesc según la plataforma
  */
 function getHermescPath(): string | null {
@@ -28,6 +58,94 @@ function getHermescPath(): string | null {
 }
 
 /**
+ * Crea un bundle para proyectos Expo
+ */
+function createExpoBundle(spinner: ReturnType<typeof ora>): string | null {
+  const buildDir = path.join(process.cwd(), "temp_flopy_build");
+  if (fs.existsSync(buildDir)) shell.rm("-rf", buildDir);
+  fs.mkdirSync(buildDir, { recursive: true });
+
+  spinner.text = "Generando bundle de Expo...";
+
+  // Expo usa `npx expo export` para generar bundles
+  const exportDir = path.join(buildDir, "dist");
+  const bundleCommand = `npx expo export --platform android --output-dir "${exportDir}"`;
+
+  const result = shell.exec(bundleCommand, { silent: true });
+  if (result.code !== 0) {
+    // Intentar con el formato antiguo de expo
+    spinner.text = "Intentando con expo export (formato alternativo)...";
+    const altCommand = `npx expo export:embed --platform android --entry-file node_modules/expo/AppEntry.js --bundle-output "${path.join(buildDir, "index.android.bundle")}" --assets-dest "${buildDir}"`;
+
+    if (shell.exec(altCommand, { silent: true }).code !== 0) {
+      // Fallback a react-native bundle con entry-file de Expo
+      spinner.text = "Usando react-native bundle con entry de Expo...";
+      const entryFile = getExpoEntryFile();
+      const rnBundleCommand = `npx react-native bundle --platform android --dev false --minify true --entry-file "${entryFile}" --bundle-output "${path.join(buildDir, "index.android.bundle")}" --assets-dest "${buildDir}"`;
+
+      if (shell.exec(rnBundleCommand, { silent: true }).code !== 0) {
+        spinner.fail("Error al crear el bundle de Expo.");
+        console.log(
+          chalk.red(
+            "Asegúrate de que `npx expo export` o `npx react-native bundle` funciona en tu proyecto.",
+          ),
+        );
+        shell.rm("-rf", buildDir);
+        return null;
+      }
+    }
+  }
+
+  spinner.text = "Bundle de Expo creado. Comprimiendo en .zip...";
+
+  const zipPath = path.join(process.cwd(), "flopy_bundle.zip");
+  if (fs.existsSync(zipPath)) shell.rm(zipPath);
+
+  // Determinar qué directorio comprimir
+  const dirToZip = fs.existsSync(exportDir) ? exportDir : buildDir;
+
+  shell.cd(dirToZip);
+  if (shell.exec(`zip -r "${zipPath}" .`, { silent: true }).code !== 0) {
+    spinner.fail("Error al comprimir el bundle.");
+    console.log(
+      chalk.red("Asegúrate de tener el comando `zip` instalado en tu sistema."),
+    );
+    shell.cd(process.cwd());
+    shell.rm("-rf", buildDir);
+    return null;
+  }
+
+  shell.cd(process.cwd());
+  shell.rm("-rf", buildDir);
+
+  const stats = fs.statSync(zipPath);
+  const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+
+  spinner.succeed(`Bundle de Expo creado con éxito (${sizeMB} MB)`);
+  console.log(
+    chalk.green(`✓ Bundle generado para proyecto Expo`),
+  );
+
+  return zipPath;
+}
+
+/**
+ * Obtiene el entry file para proyectos Expo
+ */
+function getExpoEntryFile(): string {
+  // Verificar si existe index.js personalizado
+  if (fs.existsSync("index.js")) {
+    return "index.js";
+  }
+  // Verificar App.js/App.tsx
+  if (fs.existsSync("App.js") || fs.existsSync("App.tsx")) {
+    return "node_modules/expo/AppEntry.js";
+  }
+  // Default de Expo
+  return "node_modules/expo/AppEntry.js";
+}
+
+/**
  * Detecta un proyecto de React Native, ejecuta el bundle, lo compila a Hermes bytecode y lo comprime.
  * @returns La ruta al archivo .zip temporal creado, o null si falla.
  */
@@ -39,6 +157,14 @@ export function createBundleAndZip(): string | null {
   const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
   if (!pkg.dependencies || !pkg.dependencies["react-native"]) {
     return null; // No es un proyecto de RN
+  }
+
+  // 2. Detectar si es un proyecto Expo
+  if (isExpoProject()) {
+    const spinner = ora(
+      "Detectado proyecto Expo. Creando bundle...",
+    ).start();
+    return createExpoBundle(spinner);
   }
 
   const spinner = ora(

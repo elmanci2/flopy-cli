@@ -8,12 +8,14 @@ import { registerConfigCommands } from "./commands/config";
 
 const program = new Command();
 
+const pkg = require("../package.json");
+
 program
   .name("flopy")
   .description(
     "Una CLI profesional para gestionar el servicio de actualizaciones OTA Flopy",
   )
-  .version("0.1.0")
+  .version(pkg.version)
   .usage("<command> [options]");
 
 registerConfigCommands(program);
